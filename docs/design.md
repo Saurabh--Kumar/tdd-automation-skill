@@ -1,4 +1,4 @@
-# TDD Auto — MVP Design Document
+# TDD Auto — Design Document
 
 ## 1. Goal
 
@@ -105,6 +105,12 @@ step-01-init
                                           │
                                           ▼
                                    step-08-summarize
+                                          │
+                                          ▼
+                                   step-09-design-sync   (in-place LLD update)
+                                          │
+                                          ▼
+                                   step-10-html-review   (generate + host page)
 ```
 
 `progress.yaml` is the routing document. Fields:
@@ -119,6 +125,7 @@ lastSaved: <ISO timestamp>
 requirementsChecksum: <sha256 of requirements.md>
 testCasesChecksum: <sha256 of test-cases.md>
 brainstormNotes: <path to brainstorm-notes.md>
+driftReport: <path to drift-report.md>
 testCommand: pytest
 ```
 
@@ -142,27 +149,33 @@ testCommand: pytest
 
 ### step-02-evaluate-lld
 
-**Purpose:** Read design docs, surface ambiguities, ask clarifying questions.
+**Purpose:** Read design docs, surface ambiguities, detect architectural drift, ask clarifying questions.
 
 **Behavior:**
 - Read all `.md` files in `.tdd-auto/design/`
 - Read the user's request
+- Extract any Mermaid diagram blocks from the LLD files and store them for later use in the HTML review page
 - Produce `brainstorm-notes.md`:
   - What the request seems to ask for
   - Ambiguities in the request
   - Ambiguities found in the design
   - Clarifying questions
-- Present to user, wait for response
+  - Relevant diagrams extracted from LLD
+- Produce `drift-report.md`:
+  - For each significant divergence between request and LLD
+  - LLD says vs Request asks, drift type, severity
+- Present both to user, wait for response
 - If design is sparse or self-contradictory, note that explicitly
+- If drift is detected, user must acknowledge each drift point before proceeding
 
-**Advances to:** step-03 after user confirms understanding
+**Advances to:** step-03 after user confirms understanding and acknowledges drift
 
 ### step-03-requirements
 
-**Purpose:** Produce requirements from brainstorm exchange.
+**Purpose:** Produce requirements from brainstorm exchange and approved drift.
 
 **Behavior:**
-- Read `brainstorm-notes.md` and user's clarifying answers
+- Read `brainstorm-notes.md`, `drift-report.md`, and user's clarifying answers
 - Fill `requirements.md` from template:
   - Feature overview
   - Functional requirements
@@ -170,6 +183,7 @@ testCommand: pytest
   - Dependencies
   - Out of scope
   - Open questions (if any remain)
+  - Design drift section (approved drift points from `drift-report.md`)
 - Write to `.tdd-auto/runs/<feature-slug>/requirements.md` with `status: draft`
 - Tell user: "Requirements written to `<path>`. Edit if needed, then say `requirements approved`."
 - Do not advance until user says "requirements approved" (or equivalent)
@@ -203,6 +217,7 @@ testCommand: pytest
 - Produce `sub-problems.md`:
   - Ordered list of sub-problems
   - Each with: ID, description, files to touch, acceptance criteria, relevant test IDs
+  - For sub-problems that involve multi-step interactions, include a Mermaid sequence or flow diagram
 - AI-generated. No human gate — the human reviews via the final summary.
 - Write to `.tdd-auto/runs/<feature-slug>/sub-problems.md`
 
@@ -250,7 +265,39 @@ testCommand: pytest
   - Files modified
   - Any open issues
 - Set `progress.yaml` status to `completed`
-- Present summary to user
+
+**Advances to:** step-09-design-sync
+
+### step-09-design-sync
+
+**Purpose:** Update LLD to incorporate approved drift.
+
+**Behavior:**
+- Read `drift-report.md` and `requirements.md`
+- For each approved drift:
+  - Find the relevant section in `.tdd-auto/design/`
+  - Update inline, preserving surrounding context
+  - If a diagram needs updating (Mermaid, sequence), update it in place
+- Write updated LLD files back to `.tdd-auto/design/`
+- Record changes in `run-log.md` with `<!-- DESIGN SYNC -->` marker
+- Present diff to user: "Updated 2 sections in `lld.md`. Review the changes."
+
+**Advances to:** step-10-html-review
+
+### step-10-html-review
+
+**Purpose:** Generate and host reviewer-facing HTML page.
+
+**Behavior:**
+- Read `requirements.md`, `test-cases.md`, `drift-report.md`, `sub-problems.md`, `run-log.md`
+- Generate `review.html` with embedded CSS and Mermaid.js CDN
+- Sections: requirements, test cases, design drift, implementation summary
+- Attempt to host on GitHub Pages:
+  - Check `gh` CLI availability and auth status
+  - If auth fails, prompt user to refresh token
+  - If Pages enabled, commit and push HTML, construct URL
+  - If Pages not enabled or `gh` unavailable, provide as local artifact
+- Present URL to user: "Review page: <url>"
 
 **Ends workflow.**
 
@@ -310,17 +357,21 @@ User: ./docs/design/
 Copy all .md files to .tdd-auto/design/
 Detect test framework → write config.yaml
   ↓
-step-02: Read design, produce brainstorm-notes.md
-"From your design I see X. Your request mentions Y but the design doesn't cover Z. Clarifying questions: ..."
+step-02: Read design, produce brainstorm-notes.md and drift-report.md
+"From your design I see X. Your request mentions Y but the design doesn't cover Z. 
+Clarifying questions: ...
+Also, design drift detected: JWT vs session cookies. Approve?"
   ↓
-User answers
+User answers, acknowledges drift
   ↓
-step-03: requirements.md (draft) → user approves
+step-03: requirements.md (draft, includes drift section) → user approves
 step-04: test-cases.md (draft) → user approves
 step-05: sub-problems.md
 step-06: sequential subagents implement
 step-07: pytest (all green)
 step-08: summary
+step-09: design sync — update LLD inline
+step-10: generate review.html, attempt to host on GitHub Pages
 ```
 
 ## 9. Resume Flow
@@ -351,6 +402,11 @@ Regenerate test-cases.md
 User approves updated tests
   ↓
 Continue from step-06
+  ↓
+step-07: run tests
+step-08: summarize
+step-09: design sync (if drift changed)
+step-10: update HTML review page
 ```
 
 ## 11. Scope Boundary (MVP)
@@ -362,6 +418,10 @@ Continue from step-06
 - Auto-detected test framework
 - Full resume/edit support
 - Hidden `.tdd-auto/` runtime folder
+- Architectural drift detection at requirements gate
+- In-place LLD sync after tests pass
+- HTML review page generation and GitHub Pages hosting
+- Plugin packaging and installer script for distribution
 
 **Out of scope (future):**
 - Parallel subagents
@@ -369,7 +429,6 @@ Continue from step-06
 - Coverage thresholds
 - CI integration
 - Epic/chain workflows
-- Plugin marketplace packaging
 
 ## 12. Failure Recovery
 
@@ -377,7 +436,7 @@ The skill should attempt to recover from failures before surfacing to the user.
 
 ### Subagent failure recovery
 
-- For example, If a subagent fails during step-06, retry the same sub-problem once with the failure context attached.
+- If a subagent for example, fails during step-06, retry the same sub-problem once with the failure context attached.
 - If the retry also fails, surface the failure to the user with:
   - Which sub-problem failed
   - What the subagent reported
@@ -397,8 +456,32 @@ The skill should attempt to recover from failures before surfacing to the user.
 
 The recovery loop is bounded to prevent infinite retry cycles.
 
+### Design sync failure recovery
 
-## 13. PR Review Workflow (`tdd-auto-pr`)
+- If LLD update fails (file not found, permission error), surface to user with:
+  - Which file failed
+  - Error message
+  - Options: retry, skip LLD update, or halt
+
+### HTML hosting failure recovery
+
+- If GitHub Pages hosting fails due to auth, prompt user to refresh `gh` token
+- If Pages not enabled or `gh` unavailable, provide HTML as local artifact without blocking
+
+## 13. Key Risks
+
+| Risk | Mitigation |
+|---|---|
+| Subagent produces code that doesn't compile | step-06 logs failures; step-07 catches test failures |
+| User edits requirements without realizing it invalidates tests | step-01c detects checksum change, warns explicitly |
+| Design docs are insufficient | step-02 surfaces this; user can supplement before requirements |
+| Long runs exhaust context | State is written to disk after every step; resume is safe |
+| Subagents drift out of scope | Each subagent receives only its sub-problem spec + relevant excerpts |
+| LLD update fails due to file permissions | step-09 surfaces error, offers retry/skip/halt |
+| GitHub Pages auth token expired | step-10 prompts user to refresh `gh auth login` |
+| HTML page becomes stale | step-10 updates existing page in review mode; generates fresh in greenfield |
+
+## 14. PR Review Workflow (`tdd-auto-pr`)
 
 ### Purpose
 
@@ -527,21 +610,9 @@ Same recovery behavior as greenfield:
 - Requirements that need LLD changes (flagged explicitly, not auto-handled)
 - Parallel rework of sub-problems (sequential for now)
 
-## 14. Full Scope Feature Roadmap
+## 15. `tdd-auto-pr` — Directory, Artifact, and Step Design
 
-Items marked as future work beyond the MVP:
-
-| Feature | Notes |
-|---|---|
-| `tdd-auto-pr` skill | PR review comment resolution workflow |
-| Parallel subagents | Run independent sub-problems concurrently |
-| Coverage thresholds | Enforce minimum coverage as part of test pass |
-| LLD change detection | Handle review comments that require design doc changes |
-| Plugin marketplace packaging | Distribute as an installable plugin |
-
-## 16. `tdd-auto-pr` — Directory, Artifact, and Step Design
-
-### 16.1 Skill Source Structure
+### 15.1 Skill Source Structure
 
 Installed into `.claude/skills/tdd-auto-pr/`:
 
@@ -569,7 +640,7 @@ tdd-auto-pr/
     └── comment-categorization.md
 ```
 
-### 16.2 Project Runtime Artifacts
+### 15.2 Project Runtime Artifacts
 
 Reuses the existing run folder. No new top-level directory:
 
@@ -592,7 +663,7 @@ project-root/
 
 `review-comments.md` and `change-manifest.md` are ephemeral. `requirements.md`, `test-cases.md`, and `sub-problems.md` are mutated in place — the baseline is the pre-review version, the current version is the post-review version.
 
-### 16.3 Progress YAML Additions
+### 15.3 Progress YAML Additions
 
 `progress.yaml` gains review-specific fields:
 
@@ -619,7 +690,7 @@ testCasesDelta: true
 
 `reviewMode: true` is the flag that distinguishes a review run from a greenfield run. When `true`, the skill operates in delta mode: it loads the baseline, categorizes comments, and reworks only what changed.
 
-### 16.4 Step Contracts
+### 15.4 Step Contracts
 
 #### step-01-init
 
@@ -792,7 +863,7 @@ testCasesDelta: true
 - Route to `nextStep`
 - If `nextStep` is empty or unknown, halt and ask user to start fresh review
 
-### 16.5 Change Manifest Template
+### 15.5 Change Manifest Template
 
 `templates/change-manifest-template.md`:
 
@@ -813,7 +884,7 @@ baselineTestCasesChecksum: <sha256>
 |---|---|---|---|---|
 ```
 
-### 16.6 State Transitions
+### 15.6 State Transitions
 
 ```
 step-01-init
@@ -850,7 +921,7 @@ step-01-init
                             step-09-summarize
 ```
 
-### 16.7 Partial Re-approval Behavior
+### 15.7 Partial Re-approval Behavior
 
 When `requirementsDelta: true`, the human reviews only the changed requirements. Unchanged requirements are not re-presented. The same applies to test cases.
 
@@ -859,7 +930,7 @@ Implementation:
 - The skill extracts only the marked sections for human review
 - Unchanged sections are carried forward without re-approval
 
-### 16.8 Recovery in Review Mode
+### 15.8 Recovery in Review Mode
 
 Same bounded recovery as greenfield:
 
@@ -867,7 +938,7 @@ Same bounded recovery as greenfield:
 - **Test failure:** recovery loop up to 2 times with fix suggestions scoped to affected sub-problems only
 - **LLD contradiction:** surface immediately, no auto-recovery — this requires human decision
 
-### 16.9 First Review Flow
+### 15.9 First Review Flow
 
 ```
 User: @tdd-auto-pr .tdd-auto/runs/user-auth-flow/ "Reviewer comments: ..."
@@ -896,3 +967,245 @@ step-08-run-tests: pytest (all green)
   ↓
 step-09-summarize: PR-ready summary
 ```
+
+## 16. Architectural Drift Detection and LLD Sync
+
+### 16.1 Purpose
+
+Detect when the user's request or the resulting implementation diverges from the documented LLD, and keep the LLD in sync with reality.
+
+### 16.2 Drift Detection Points
+
+Drift is detected in two places:
+
+**A. At the requirements gate (step-03 / step-04)**
+
+When the skill analyzes the user's request against the LLD, it produces a `drift-report.md`:
+
+```markdown
+## Design Drift Report
+
+**Feature:** user-auth-flow
+**Date:** 2026-07-25
+
+| # | LLD Says | Request Asks | Drift Type | Severity | User Decision |
+|---|---|---|---|---|---|
+| 1 | Auth uses JWT tokens (session: 24h) | Request asks for session cookies with 7-day expiry | Architecture | High | Approve / Reject |
+| 2 | API is REST (OpenAPI spec) | Request implies GraphQL mutations | Scope | Medium | Approve / Reject |
+| 3 | Password hashing: bcrypt | Request mentions SHA-256 | Implementation | Low | Approve / Reject |
+```
+
+The user must acknowledge each drift point before `requirements.md` is finalized:
+- **Approve drift** → proceed with the new direction, update requirements accordingly
+- **Reject drift** → adjust the request to align with the LLD, or update the LLD first
+
+**B. At the end of the workflow (design sync step)**
+
+After tests pass, the skill performs an in-place LLD update. This is a separate step that runs after step-08 in greenfield mode and after step-09 in review mode.
+
+### 16.3 In-Place LLD Update (Not "Last Updated" Section)
+
+The skill updates the relevant LLD files **at the exact location where the concept is described**, not by appending a "last updated" section. This prevents confusion where a reader sees contradictory statements in the same document.
+
+For example, if the LLD says "authentication uses JWT tokens" and the approved drift changes it to session cookies, the skill:
+1. Locates the "authentication" section in the relevant LLD file
+2. Replaces the JWT description with the session cookie description
+3. Updates any related diagrams or API contracts in the same file
+4. Records the change in `run-log.md` for traceability
+
+The skill should be surgical: update only the sections that changed, leave everything else untouched.
+
+### 16.4 Design Sync Step Contract
+
+**Purpose:** Update LLD to incorporate approved drift.
+
+**Behavior:**
+- Read `drift-report.md` and `requirements.md`
+- For each approved drift:
+  - Find the relevant section in `.tdd-auto/design/`
+  - Update inline, preserving surrounding context
+  - If a diagram needs updating (Mermaid, sequence), update it in place
+- Write updated LLD files back to `.tdd-auto/design/`
+- Record changes in `run-log.md` with `<!-- DESIGN SYNC -->` marker
+- Present diff to user: "Updated 2 sections in `lld.md`. Review the changes."
+
+**Advances to:** End of workflow (after step-08 in greenfield, after step-09 in review)
+
+### 16.5 Drift Report in Review Mode
+
+In review mode, if a review comment changes a requirement that was already a drift from the original LLD, the drift report should note the **cumulative drift**:
+
+```markdown
+| # | Original LLD | Current State | Change |
+|---|---|---|---|
+| 1 | Auth uses JWT tokens | Auth uses session cookies (approved in run user-auth-flow) | No change needed |
+| 2 | API is REST | API is GraphQL (new drift from review comment) | Requires approval |
+```
+
+This helps the user see the evolution of the design over time.
+
+## 17. HTML Review Page
+
+### 17.1 Purpose
+
+Generate a single-page HTML artifact that renders the agreed requirements, test cases, design drift, and implementation summary in a reviewer-friendly format. Host it on GitHub Pages if available, otherwise provide it as a local artifact.
+
+### 17.2 Page Structure
+
+The HTML is a single file (`review.html`) with embedded CSS, JS, and Mermaid.js loaded from CDN. It contains:
+
+```html
+<!DOCTYPE html>
+<html>
+<head>
+  <title>PR Review: user-auth-flow</title>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+  <style>/* embedded CSS */</style>
+</head>
+<body>
+  <header>
+    <h1>PR Review: user-auth-flow</h1>
+    <p>Baseline: 2026-07-25 | Review: 2026-07-26</p>
+  </header>
+
+  <section id="requirements">
+    <h2>Agreed Requirements</h2>
+    <!-- Rendered requirements.md -->
+  </section>
+
+  <section id="test-cases">
+    <h2>Agreed Test Cases</h2>
+    <!-- Rendered test-cases.md, Given/When/Then formatted -->
+  </section>
+
+  <section id="drift">
+    <h2>Design Drift</h2>
+    <!-- Drift report if any -->
+  </section>
+
+  <section id="implementation">
+    <h2>What Was Implemented</h2>
+    <!-- Sub-problems with completion status -->
+    <!-- Mermaid diagrams if present in sub-problems.md -->
+  </section>
+
+  <section id="delta" class="review-mode-only">
+    <h2>What Changed in This Review</h2>
+    <!-- In review mode: diff-like view of changes -->
+  </section>
+</body>
+</html>
+```
+
+### 17.3 Diagram Support
+
+Mermaid.js is embedded via CDN. Diagrams are authored as part of the sub-problem specs or the LLD. The skill does **not** auto-generate diagrams from code — that's a future enhancement.
+
+For MVP, diagrams come from:
+- Existing Mermaid blocks in `.tdd-auto/design/` files
+- Mermaid blocks authored in `sub-problems.md` by the skill
+
+The HTML page renders all Mermaid blocks automatically.
+
+### 17.4 GitHub Pages Hosting
+
+**Detection:**
+1. Check if `gh` CLI is available: `which gh`
+2. Check if authenticated: `gh auth status`
+3. If authenticated, check if Pages is enabled: `gh api repos/{owner}/{repo}/pages`
+4. If Pages is enabled, determine the Pages URL and base path
+
+**Auth failure handling:**
+If `gh auth status` fails with an auth error, prompt the user:
+```
+GitHub CLI authentication expired. Run `gh auth login` to refresh your token, then retry.
+```
+
+If Pages is not enabled or `gh` is unavailable, skip hosting and provide the HTML as a local artifact.
+
+**Hosting flow:**
+1. Determine the target directory for Pages (e.g. `.tdd-auto/pages/` or `docs/` depending on Pages config)
+2. Copy `review.html` and any assets to the target directory
+3. Commit and push: `git add`, `git commit`, `git push`
+4. Construct the Pages URL from the repo configuration
+5. Present the URL to the user
+
+**URL pattern:**
+- User Pages: `https://<username>.github.io/<repo>/runs/<feature-slug>/`
+- Org Pages: `https://<org>.github.io/<repo>/runs/<feature-slug>/`
+- Project Pages with custom domain: use the configured domain
+
+The skill detects the correct pattern from the Pages API response.
+
+### 17.5 Review Mode HTML Updates
+
+In review mode, the HTML page is **updated**, not regenerated from scratch. The skill:
+
+1. Loads the existing `review.html` from the Pages directory (or from the run folder if not hosted)
+2. Updates the relevant sections:
+   - Append new requirements / mark updated ones
+   - Append new test cases / mark updated ones
+   - Add delta section showing what changed
+3. Re-host if Pages is available
+
+This preserves the reviewer's context — they can see the full history, not just the latest state.
+
+### 17.6 HTML Step Placement
+
+**Greenfield mode:** Added as step-09 (after summarize, after design sync). The step generates the HTML, attempts to host, and presents the URL.
+
+**Review mode:** Added as step-10 (after summarize). Same behavior, but updates the existing HTML instead of creating from scratch.
+
+### 17.7 Fallback Behavior
+
+If GitHub Pages hosting fails for any reason other than auth:
+1. Write `review.html` to the run folder
+2. Tell the user: "Could not host on GitHub Pages: <reason>. HTML is available at `<local-path>`. You can view it locally or host it manually."
+3. Do not block the workflow — the HTML is still a useful artifact
+
+## 18. Future Diagram Generation Challenges
+
+Auto-generating interaction diagrams, sequence diagrams, and other visuals from code or sub-problem specs is a future enhancement. The challenges include:
+
+- **Accuracy:** Diagrams generated from code can become stale as the code evolves. Maintaining them requires either regenerating on every run (expensive) or accepting that they may drift from reality.
+- **Scope selection:** Not every code path deserves a diagram. Deciding what to visualize requires judgment about what helps reviewers understand the PR.
+- **Tooling:** There are libraries that can generate Mermaid/PlantUML from code (e.g. `mermaid-cli`, `pyreverse` for Python), but they produce verbose, noisy output that needs curation.
+- **Sub-problem granularity:** Sub-problems are implementation-level, not design-level. A sub-problem might touch 10 files and 20 functions — generating a meaningful diagram from that requires abstraction, not just raw code analysis.
+
+For now, the approach is to **author diagrams as part of the workflow** (in LLD files or sub-problem specs) rather than generate them from code. This keeps diagrams intentional and accurate. Auto-generation can be revisited once the core workflow is stable.
+
+## 19. Post-MVP Roadmap
+
+| Feature | Notes |
+|---|---|
+| `tdd-auto-pr` skill | PR review comment resolution workflow |
+| Parallel subagents | Run independent sub-problems concurrently |
+| LLD change detection | Handle review comments that require design doc changes |
+| Auto-generated diagrams | Generate Mermaid/sequence diagrams from sub-problem specs (future) |
+
+## 20. Installer Script
+
+### 20.1 Purpose
+
+Provide a simple bash installer that copies the skill into a project's `.claude/skills/` directory and performs first-time setup.
+
+### 20.2 Script Location
+
+`scripts/install.sh` at the repo root.
+
+### 20.3 Behavior
+
+1. Accept a target project path as argument (default: current directory)
+2. Copy `tdd-auto/` and `tdd-auto-pr/` into `<target>/.claude/skills/`
+3. If an existing install is found, back it up to `.claude/skills/<skill-name>.bak/` before overwriting
+4. Preserve `.tdd-auto/` runtime directory if it exists — do not overwrite it
+5. Add `.tdd-auto/runs/` to the target project's `.gitignore` if not already present
+6. Print installation summary: skill paths, next steps (first invocation instructions)
+
+### 20.4 Uninstall
+
+`scripts/uninstall.sh` removes the skill directories from `.claude/skills/` but preserves `.tdd-auto/` runtime state. The user can delete `.tdd-auto/` manually if they want a clean removal.
+
+### 20.5 Version Tracking
+
+A `VERSION` file at the repo root. The installer reads it and writes it into `customize.toml` during install. Future upgrades can compare versions and prompt the user if a major version change is detected.

@@ -6,13 +6,16 @@ A Claude skill that automates the Test-Driven Development workflow while keeping
 
 `tdd-auto` takes a feature request and a Low-Level Design (LLD), then walks through the full TDD cycle:
 
-1. **Evaluate LLD** — Reads the project's design documents, surfaces ambiguities, and asks clarifying questions before any code is written.
+1. **Evaluate LLD** — Reads the project's design documents, surfaces ambiguities, detects architectural drift, and asks clarifying questions before any code is written.
 2. **Requirements** — Produces a requirements document from the clarified intent. Human approves before proceeding.
 3. **Test cases** — Derives Given/When/Then test cases from the approved requirements. Human approves before proceeding.
 4. **Sub-problems** — Breaks the feature into sequential implementation sub-problems (no gate; human reviews via the final summary).
 5. **Implement** — Dispatches sequential subagents to implement each sub-problem.
 6. **Run tests** — Detects the project's test framework, runs the agreed test cases, and reports results.
-7. **Summarize** — Produces a final summary of what was built and the test results.
+7. **Design sync** — Updates the LLD in place to incorporate any approved architectural drift.
+8. **HTML review page** — Generates a reviewer-facing HTML page and hosts it on GitHub Pages if available.
+
+A companion skill, `tdd-auto-pr`, addresses PR review comments by reworking existing feature artifacts through the same workflow.
 
 ## Key principles
 
