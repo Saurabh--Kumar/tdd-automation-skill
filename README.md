@@ -17,6 +17,20 @@ A Claude skill that automates the Test-Driven Development workflow while keeping
 
 A companion skill, `tdd-auto-pr`, addresses PR review comments by reworking existing feature artifacts through the same workflow.
 
+## `tdd-auto-pr`
+
+`tdd-auto-pr` takes an existing feature run folder and PR review comments, then resolves them through the same TDD workflow:
+
+1. **Load baseline** — Loads the existing requirements, test cases, sub-problems, and implementation from the run folder.
+2. **Categorize comments** — Classifies each review comment as nit/style, bug, requirement clarification, or new requirement. Produces a change manifest for user approval.
+3. **Requirements** — If requirements changed, updates `requirements.md` and re-validates against the LLD. User partially approves changed requirements only.
+4. **Test cases** — If requirements changed, updates `test-cases.md` to match. User partially approves changed tests only.
+5. **Sub-problems** — Regenerates `sub-problems.md` for affected sub-problems only.
+6. **Implement** — Re-implements only the affected sub-problems via sequential subagents.
+7. **Run tests** — Runs the full test suite with recovery on failures.
+8. **Summarize** — Produces a PR-ready summary of what changed and test results.
+9. **HTML review page** — Updates the existing reviewer-facing HTML page with the delta and re-hosts if GitHub Pages is available.
+
 ## Key principles
 
 - **Human control at every gate.** Requirements and test cases are written to disk as editable markdown. The workflow does not advance until the human explicitly approves.
