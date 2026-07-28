@@ -1,0 +1,14 @@
+---
+workflow_status: in-progress
+feature_slug: <kebab-case-id>
+current_step: step-01-init
+steps_completed: []
+next_step: step-02-evaluate-lld
+last_saved: <ISO timestamp>
+requirements_checksum: <sha256 of requirements.md>
+test_cases_checksum: <sha256 of test-cases.md>
+brainstorm_notes: runs/<feature-slug>/brainstorm-notes.md
+drift_report: runs/<feature-slug>/drift-report.md
+test_command: pytest
+feature_request: "<user's original request>"
+lld_dir: ".tdd-auto/design/"
