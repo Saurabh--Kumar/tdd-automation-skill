@@ -2,6 +2,18 @@
 
 A Claude skill that automates the Test-Driven Development workflow while keeping the human in control at every gate.
 
+## The problem with prompt-driven implementation
+
+Giving an agent a design doc and a feature prompt is a one-shot attempt with no structured feedback loop. The table below contrasts that approach with what this skill provides.
+
+| Without this skill | With this skill |
+|---|---|
+| Agent silently invents or omits requirements based on ambiguous design docs | LLD is evaluated for ambiguities and drift before any code is written; clarifying questions are surfaced up front |
+| No editable artifact to review before implementation begins | Requirements and Given/When/Then test cases are written to disk as markdown; workflow halts until human explicitly approves each |
+| Architectural drift discovered only after code is written, requiring costly rewrites | Design sync step updates the LLD in place after implementation, keeping the design and code aligned |
+| Context window exhaustion mid-run loses all progress | All state persisted to `.tdd-auto/runs/<feature-slug>/`; interrupted runs resume from the last approved gate |
+| PR review feedback requires re-reading the full diff and re-implementing from scratch | Companion `tdd-auto-pr` workflow reworks only affected artifacts through the same TDD cycle and produces a PR-ready summary |
+
 ## What it does
 
 `tdd-auto` takes a feature request and a Low-Level Design (LLD), then walks through the full TDD cycle:
