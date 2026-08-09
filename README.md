@@ -14,6 +14,53 @@ Giving an agent a design doc and a feature prompt is a one-shot attempt with no 
 | Context window exhaustion mid-run loses all progress | All state persisted to `.tdd-auto/runs/<feature-slug>/`; interrupted runs resume from the last approved gate |
 | PR review feedback requires re-reading the full diff and re-implementing from scratch | Companion `tdd-auto-pr` workflow reworks only affected artifacts through the same TDD cycle and produces a PR-ready summary |
 
+## Installation
+
+The repository contains the skill source under `tdd-auto/`. Install it by copying that folder into your project's (or user-level) Claude skills directory:
+
+```bash
+# Project-scoped (only this project)
+cp -r tdd-auto/ .claude/skills/tdd-auto/
+
+# Or user-scoped (all projects)
+cp -r tdd-auto/ ~/.claude/skills/tdd-auto/
+```
+
+### Requirements
+
+- A Claude Code (or compatible) environment that loads skills from `.claude/skills/`.
+- `bash` available on your `PATH` (used by `scripts/detect-test-framework.sh` to auto-detect your test runner).
+- Git initialized in the target project (the workflow persists state to `.tdd-auto/` at the project root).
+
+No other dependencies are required — the skill is standalone and does not rely on BMAD or any other framework.
+
+## Usage
+
+1. **Prepare your design.** Have a Low-Level Design (LLD) ready. On first run, the skill asks for the path to your LLD documents and copies them into `.tdd-auto/design/`.
+
+2. **Invoke the skill.** Start a Claude session in your project and run:
+
+   ```
+   /tdd-auto
+   ```
+
+   Provide the feature request (a short description of what to build). The skill reads your LLD, surfaces ambiguities, and asks clarifying questions before any code is written.
+
+3. **Approve each gate.** The workflow writes editable artifacts to disk and halts at each gate:
+   - Requirements (`requirements.md`)
+   - Test cases (`test-cases.md`)
+
+   Review them in your IDE, edit if needed, and explicitly approve to continue.
+
+4. **Implement & verify.** The skill breaks the feature into sub-problems, dispatches sequential subagents to implement them, then auto-detects and runs your test framework.
+
+5. **Review the output.** A reviewer-facing HTML page is generated and (if available) hosted on GitHub Pages. The LLD is synced in place to reflect any approved drift.
+
+### Resuming an interrupted run
+
+All state is persisted to `.tdd-auto/runs/<feature-slug>/`. If a run is interrupted, simply invoke `/tdd-auto` again — the skill detects the existing run and resumes from the last approved gate. To edit artifacts mid-run, make your changes on disk and resume; the skill re-reads them.
+
+
 ## What it does
 
 `tdd-auto` takes a feature request and a Low-Level Design (LLD), then walks through the full TDD cycle:
