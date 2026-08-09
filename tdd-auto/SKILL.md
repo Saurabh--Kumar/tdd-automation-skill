@@ -35,7 +35,7 @@ Check if `{project-root}/.tdd-auto/` exists. If not:
 1. Create `{project-root}/.tdd-auto/design/` and `{project-root}/.tdd-auto/runs/`
 2. Add `.tdd-auto/runs/` to `.gitignore`
 3. Ask user: "No design found. Provide a path to your LLD documents."
-4. Copy all design files from the provided path into `.tdd-auto/design/`
+4. Copy ALL files (any format: `.md`, `.txt`, `.drawio`, images, etc.) from the provided path into `.tdd-auto/design/`
 5. Run `scripts/detect-test-framework.sh` and write `.tdd-auto/config.yaml`
 
 ## First workflow step

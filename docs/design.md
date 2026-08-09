@@ -35,6 +35,8 @@ tdd-auto/
 │   ├── step-06-implement.md
 │   ├── step-07-run-tests.md
 │   ├── step-08-summarize.md
+│   ├── step-09-design-sync.md
+│   ├── step-10-review-package.md
 │   ├── step-01b-resume.md
 │   └── step-01c-edit.md
 ├── templates/
@@ -110,7 +112,7 @@ step-01-init
                                    step-09-design-sync   (in-place LLD update)
                                           │
                                           ▼
-                                   step-10-html-review   (generate + host page)
+                                    step-10-review-package   (generate MD package)
 ```
 
 `progress.yaml` is the routing document. Fields:
@@ -139,7 +141,7 @@ testCommand: pytest
 - If `.tdd-auto/` does not exist → first-run setup:
   - Create `.tdd-auto/design/`, `.tdd-auto/runs/`
   - Add `.tdd-auto/runs/` to `.gitignore`
-  - Ask user for design directory path. Copy all `.md` files into `.tdd-auto/design/`
+  - Ask user for design directory path. Copy ALL files (any format) into `.tdd-auto/design/`
   - Run `scripts/detect-test-framework.sh`, write `config.yaml`
 - If `.tdd-auto/` exists and user references an existing `progress.yaml` → resume mode
 - If user says "edit requirements" or "edit tests" → edit mode
@@ -152,15 +154,15 @@ testCommand: pytest
 **Purpose:** Read design docs, surface ambiguities, detect architectural drift, ask clarifying questions.
 
 **Behavior:**
-- Read all `.md` files in `.tdd-auto/design/`
+- Read every file in `.tdd-auto/design/` — design docs may be in ANY format (`.md`, `.txt`, `.drawio`, images, etc.). For binary/image files, inspect them visually and describe their content.
 - Read the user's request
-- Extract any Mermaid diagram blocks from the LLD files and store them for later use in the HTML review page
+- Inventory every diagram in the LLD — Mermaid, PlantUML, UML, ASCII art, or embedded images. Preserve them exactly as authored; do NOT force Mermaid onto existing diagrams. Only diagrams the skill itself authors (e.g. inside `sub-problems.md`) use Mermaid, because it renders natively on GitHub.
 - Produce `brainstorm-notes.md`:
   - What the request seems to ask for
   - Ambiguities in the request
   - Ambiguities found in the design
   - Clarifying questions
-  - Relevant diagrams extracted from LLD
+  - Relevant diagrams (all types found in the LLD: type, location, what they show)
 - Produce `drift-report.md`:
   - For each significant divergence between request and LLD
   - LLD says vs Request asks, drift type, severity
@@ -277,27 +279,32 @@ testCommand: pytest
 - For each approved drift:
   - Find the relevant section in `.tdd-auto/design/`
   - Update inline, preserving surrounding context
-  - If a diagram needs updating (Mermaid, sequence), update it in place
+  - If a diagram needs updating (any type: Mermaid, sequence, UML, image), update it in place
 - Write updated LLD files back to `.tdd-auto/design/`
 - Record changes in `run-log.md` with `<!-- DESIGN SYNC -->` marker
 - Present diff to user: "Updated 2 sections in `lld.md`. Review the changes."
 
-**Advances to:** step-10-html-review
+**Advances to:** step-10-review-package
 
-### step-10-html-review
+### step-10-review-package
 
-**Purpose:** Generate and host reviewer-facing HTML page.
+**Purpose:** Produce a single Markdown review package the user pastes directly into the GitHub PR description, so reviewers understand what changed and what to expect without leaving the PR page.
 
 **Behavior:**
 - Read `requirements.md`, `test-cases.md`, `drift-report.md`, `sub-problems.md`, `run-log.md`
-- Generate `review.html` with embedded CSS and Mermaid.js CDN
-- Sections: requirements, test cases, design drift, implementation summary
-- Attempt to host on GitHub Pages:
-  - Check `gh` CLI availability and auth status
-  - If auth fails, prompt user to refresh token
-  - If Pages enabled, commit and push HTML, construct URL
-  - If Pages not enabled or `gh` unavailable, provide as local artifact
-- Present URL to user: "Review page: <url>"
+- Write `review-package.md` (plain Markdown, paste-ready):
+  - Title + one-line summary
+  - TL;DR for reviewers (what changed, test outcome, approved drift, what to look at)
+  - Agreed requirements (essentials only)
+  - Design drift (LLD said vs what was built, and why it was approved)
+  - Test coverage (Given/When/Then, grouped by requirement)
+  - Implementation summary (sub-problems with status + files touched)
+  - Test results (pass/fail counts + command)
+  - Open issues / follow-ups
+- Embed text-based diagrams (Mermaid/PlantUML/ASCII) inline; link image diagrams from `.tdd-auto/design/` and summarize them
+- Do NOT simply concatenate the artifacts — combine them into one coherent narrative
+- Do NOT generate HTML and do NOT host anything
+- Tell the user the file path; they paste it into the PR
 
 **Ends workflow.**
 
@@ -330,15 +337,22 @@ testCommand: pytest
 
 ## 7. Test Framework Detection
 
-`scripts/detect-test-framework.sh` inspects the project root:
+`scripts/detect-test-framework.sh` decides which command to run. It is intentionally robust rather than brittle:
 
-| Signal | Detected command |
-|---|---|
-| `package.json` with `jest`/`mocha`/`vitest` | `npm test` |
-| `pyproject.toml` or `setup.cfg` with `pytest` | `pytest` |
-| `go.mod` present | `go test ./...` |
-| `Cargo.toml` present | `cargo test` |
-| None of the above | Prompt user for test command |
+1. **Existing tests win.** Scan the repo for actual test files and map them to a framework:
+   - `test_*.py` / `*_test.py` → `pytest`
+   - `*.test.js` / `*.spec.js` / `*.test.ts` / `*.spec.ts` → `npm test`
+   - `*_test.go` → `go test ./...`
+   - `*.rs` with `Cargo.toml` → `cargo test`
+   - `*Test.java` / `*Tests.java` → `mvn test` (or `gradle test` if a Gradle build file is present)
+2. **No tests yet → sensible language default.** Fall back to the project's primary language via its manifest (`pyproject.toml`, `package.json`, `go.mod`, `Cargo.toml`, `pom.xml`, `build.gradle`) or, failing that, the dominant source-file extension:
+   - Python → `pytest`
+   - JS/TS → `npm test`
+   - Go → `go test ./...`
+   - Rust → `cargo test`
+   - Java → `mvn test` (or `gradle test`)
+
+This way a brand-new project still gets a sane default, and an existing project keeps the framework its tests already use.
 
 Result is written to `.tdd-auto/config.yaml`. User can override manually.
 
@@ -353,10 +367,10 @@ Create .tdd-auto/design/ and .tdd-auto/runs/
 Add .tdd-auto/runs/ to .gitignore
 Ask: "No design found. Provide a path to your LLD documents."
 User: ./docs/design/
-  ↓
-Copy all .md files to .tdd-auto/design/
+   ↓
+Copy all design files (any format) to .tdd-auto/design/
 Detect test framework → write config.yaml
-  ↓
+   ↓
 step-02: Read design, produce brainstorm-notes.md and drift-report.md
 "From your design I see X. Your request mentions Y but the design doesn't cover Z. 
 Clarifying questions: ...
@@ -371,7 +385,7 @@ step-06: sequential subagents implement
 step-07: pytest (all green)
 step-08: summary
 step-09: design sync — update LLD inline
-step-10: generate review.html, attempt to host on GitHub Pages
+step-10: generate review-package.md (paste into PR)
 ```
 
 ## 9. Resume Flow
@@ -406,7 +420,7 @@ Continue from step-06
 step-07: run tests
 step-08: summarize
 step-09: design sync (if drift changed)
-step-10: update HTML review page
+step-10: regenerate review-package.md
 ```
 
 ## 11. Scope Boundary (MVP)
@@ -420,7 +434,7 @@ step-10: update HTML review page
 - Hidden `.tdd-auto/` runtime folder
 - Architectural drift detection at requirements gate
 - In-place LLD sync after tests pass
-- HTML review page generation and GitHub Pages hosting
+- Markdown review package generation (paste-ready PR description)
 - Plugin packaging and installer script for distribution
 
 **Out of scope (future):**
@@ -445,11 +459,11 @@ The skill should attempt to recover from failures before surfacing to the user.
 
 ### Test failure recovery
 
-- If tests fail in step-07, attempt a recovery loop up to 2 times:
-  - Spawn a subagent to analyze the failures
-  - Subagent proposes fixes to the affected code
+- If tests fail in step-07, attempt a fix-focused recovery loop up to 2 times:
+  - Spawn a subagent with the failing output, the relevant sub-problem spec, and the affected source files
+  - The subagent applies fixes to the affected code (and corrects a test only if the test itself was wrong), keeping every other agreed test case intact
   - Re-run the tests
-- If still failing after recovery attempts, surface to the user with:
+- If still failing after real fix attempts, surface to the user with:
   - Failing test IDs
   - Error output
   - Options: retry again, skip failing tests, or halt
@@ -463,10 +477,9 @@ The recovery loop is bounded to prevent infinite retry cycles.
   - Error message
   - Options: retry, skip LLD update, or halt
 
-### HTML hosting failure recovery
+### Review package generation
 
-- If GitHub Pages hosting fails due to auth, prompt user to refresh `gh` token
-- If Pages not enabled or `gh` unavailable, provide HTML as local artifact without blocking
+- The review package is plain Markdown written to the run folder. There is no hosting step, so there is nothing to fail auth-wise. If writing the file fails (permission error), surface to the user with the error and options to retry or halt.
 
 ## 13. Key Risks
 
@@ -478,8 +491,8 @@ The recovery loop is bounded to prevent infinite retry cycles.
 | Long runs exhaust context | State is written to disk after every step; resume is safe |
 | Subagents drift out of scope | Each subagent receives only its sub-problem spec + relevant excerpts |
 | LLD update fails due to file permissions | step-09 surfaces error, offers retry/skip/halt |
-| GitHub Pages auth token expired | step-10 prompts user to refresh `gh auth login` |
-| HTML page becomes stale | step-10 updates existing page in review mode; generates fresh in greenfield |
+| Review package write fails | step-10 surfaces error, offers retry/skip/halt |
+| Review package becomes stale | step-10 regenerates the package from current artifacts at the end of every run |
 
 ## 14. PR Review Workflow (`tdd-auto-pr`)
 
@@ -1044,124 +1057,50 @@ In review mode, if a review comment changes a requirement that was already a dri
 
 This helps the user see the evolution of the design over time.
 
-## 17. HTML Review Page
+## 17. Markdown Review Package
 
 ### 17.1 Purpose
 
-Generate a single-page HTML artifact that renders the agreed requirements, test cases, design drift, and implementation summary in a reviewer-friendly format. Host it on GitHub Pages if available, otherwise provide it as a local artifact.
+Produce a single Markdown file (`review-package.md`) that the user pastes directly into a GitHub PR description. Reviewers get a coherent, top-to-bottom narrative of what changed and what to expect — without leaving the PR page. There is no HTML and no hosting step; plain Markdown renders natively on GitHub (including Mermaid diagrams).
 
-### 17.2 Page Structure
+### 17.2 Package Structure
 
-The HTML is a single file (`review.html`) with embedded CSS, JS, and Mermaid.js loaded from CDN. It contains:
+The file is **composed**, not concatenated. The skill combines the artifacts into one reviewer-facing story:
 
-```html
-<!DOCTYPE html>
-<html>
-<head>
-  <title>PR Review: user-auth-flow</title>
-  <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
-  <style>/* embedded CSS */</style>
-</head>
-<body>
-  <header>
-    <h1>PR Review: user-auth-flow</h1>
-    <p>Baseline: 2026-07-25 | Review: 2026-07-26</p>
-  </header>
-
-  <section id="requirements">
-    <h2>Agreed Requirements</h2>
-    <!-- Rendered requirements.md -->
-  </section>
-
-  <section id="test-cases">
-    <h2>Agreed Test Cases</h2>
-    <!-- Rendered test-cases.md, Given/When/Then formatted -->
-  </section>
-
-  <section id="drift">
-    <h2>Design Drift</h2>
-    <!-- Drift report if any -->
-  </section>
-
-  <section id="implementation">
-    <h2>What Was Implemented</h2>
-    <!-- Sub-problems with completion status -->
-    <!-- Mermaid diagrams if present in sub-problems.md -->
-  </section>
-
-  <section id="delta" class="review-mode-only">
-    <h2>What Changed in This Review</h2>
-    <!-- In review mode: diff-like view of changes -->
-  </section>
-</body>
-</html>
-```
+1. **Title + one-line summary** — what this PR delivers.
+2. **TL;DR for reviewers** — 3–6 bullets: high-level change, test outcome, approved design drift, and anything to scrutinize.
+3. **Agreed requirements** — essentials only (functional + non-functional + scope), boilerplate dropped.
+4. **Design drift** — LLD said vs what was built, and why the drift was approved.
+5. **Test coverage** — Given/When/Then cases grouped by requirement so intent maps to tests.
+6. **Implementation summary** — sub-problems with completion status + files touched.
+7. **Test results** — pass/fail counts and the command used.
+8. **Open issues / follow-ups** — intentional gaps or deferred work.
 
 ### 17.3 Diagram Support
 
-Mermaid.js is embedded via CDN. Diagrams are authored as part of the sub-problem specs or the LLD. The skill does **not** auto-generate diagrams from code — that's a future enhancement.
+Diagrams are embedded inline as Markdown:
+- Text-based diagrams (Mermaid, PlantUML, ASCII) are pasted verbatim and render on GitHub.
+- Image diagrams (PNG/SVG) are linked from `.tdd-auto/design/` with a one-line description of what they show.
 
-For MVP, diagrams come from:
-- Existing Mermaid blocks in `.tdd-auto/design/` files
-- Mermaid blocks authored in `sub-problems.md` by the skill
+The skill does **not** auto-generate diagrams from code — that's a future enhancement. New diagrams the skill authors (e.g. in `sub-problems.md`) use Mermaid because it renders natively on GitHub.
 
-The HTML page renders all Mermaid blocks automatically.
+### 17.4 No Hosting
 
-### 17.4 GitHub Pages Hosting
+The package is a local Markdown file at `.tdd-auto/runs/<feature-slug>/review-package.md`. The user copies its contents into the PR description. No `gh` auth, no Pages, no push — nothing to fail for auth-related reasons.
 
-**Detection:**
-1. Check if `gh` CLI is available: `which gh`
-2. Check if authenticated: `gh auth status`
-3. If authenticated, check if Pages is enabled: `gh api repos/{owner}/{repo}/pages`
-4. If Pages is enabled, determine the Pages URL and base path
+### 17.5 Review Mode Updates
 
-**Auth failure handling:**
-If `gh auth status` fails with an auth error, prompt the user:
-```
-GitHub CLI authentication expired. Run `gh auth login` to refresh your token, then retry.
-```
+In review mode the package is **regenerated** from current artifacts at the end of every run, so it always reflects the latest approved state (including any change manifest deltas).
 
-If Pages is not enabled or `gh` is unavailable, skip hosting and provide the HTML as a local artifact.
+### 17.6 Step Placement
 
-**Hosting flow:**
-1. Determine the target directory for Pages (e.g. `.tdd-auto/pages/` or `docs/` depending on Pages config)
-2. Copy `review.html` and any assets to the target directory
-3. Commit and push: `git add`, `git commit`, `git push`
-4. Construct the Pages URL from the repo configuration
-5. Present the URL to the user
+**Greenfield mode:** Added as step-10 (after summarize, after design sync). The step composes `review-package.md` and prints its path.
 
-**URL pattern:**
-- User Pages: `https://<username>.github.io/<repo>/runs/<feature-slug>/`
-- Org Pages: `https://<org>.github.io/<repo>/runs/<feature-slug>/`
-- Project Pages with custom domain: use the configured domain
-
-The skill detects the correct pattern from the Pages API response.
-
-### 17.5 Review Mode HTML Updates
-
-In review mode, the HTML page is **updated**, not regenerated from scratch. The skill:
-
-1. Loads the existing `review.html` from the Pages directory (or from the run folder if not hosted)
-2. Updates the relevant sections:
-   - Append new requirements / mark updated ones
-   - Append new test cases / mark updated ones
-   - Add delta section showing what changed
-3. Re-host if Pages is available
-
-This preserves the reviewer's context — they can see the full history, not just the latest state.
-
-### 17.6 HTML Step Placement
-
-**Greenfield mode:** Added as step-09 (after summarize, after design sync). The step generates the HTML, attempts to host, and presents the URL.
-
-**Review mode:** Added as step-10 (after summarize). Same behavior, but updates the existing HTML instead of creating from scratch.
+**Review mode:** Added as step-10 (after summarize). Same behavior, regenerated from the updated artifacts.
 
 ### 17.7 Fallback Behavior
 
-If GitHub Pages hosting fails for any reason other than auth:
-1. Write `review.html` to the run folder
-2. Tell the user: "Could not host on GitHub Pages: <reason>. HTML is available at `<local-path>`. You can view it locally or host it manually."
-3. Do not block the workflow — the HTML is still a useful artifact
+The only failure mode is a write error (e.g. permission denied). If writing `review-package.md` fails, surface the error to the user with options to retry or halt. The workflow is never blocked by hosting.
 
 ## 18. Future Diagram Generation Challenges
 

@@ -30,7 +30,7 @@ Route to new run, resume, or edit. Ensure `.tdd-auto/` exists.
 ## Instructions
 
 1. **Check runtime directory.** Does `{project-root}/.tdd-auto/` exist?
-   - If not: create `design/`, `runs/`, and add `runs/` to `.gitignore`. Inform the user and ask for the LLD documents path.
+   - If not: create `design/`, `runs/`, and add `runs/` to `.gitignore`. Inform the user and ask for the LLD documents path (any format: `.md`, `.txt`, `.drawio`, images, etc.).
    - If yes: continue.
 
 2. **Resolve `feature_slug`.** Derive a kebab-case slug from the user's request. If the request references an existing `progress.yaml`, use that slug. Otherwise generate a new one.

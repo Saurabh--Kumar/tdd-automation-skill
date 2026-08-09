@@ -23,7 +23,7 @@ Update LLD to incorporate approved drift.
 2. **For each approved drift:**
    - Find the relevant section in `.tdd-auto/design/`.
    - Update inline, preserving surrounding context.
-   - If a diagram needs updating (Mermaid, sequence), update it in place.
+   - If a diagram needs updating (any type: Mermaid, sequence, UML, image), update it in place.
 
 3. **Write updated LLD files** back to `.tdd-auto/design/`.
 
@@ -36,4 +36,4 @@ Update LLD to incorporate approved drift.
 
 ## Advances to
 
-- `./step-10-html-review.md`
+- `./step-10-review-package.md`

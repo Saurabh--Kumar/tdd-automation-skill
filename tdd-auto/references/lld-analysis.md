@@ -6,21 +6,20 @@ This reference guides the agent through reading and evaluating Low-Level Design 
 
 ## Reading LLDs
 
-1. Read every file in `.tdd-auto/design/`.
+1. Read EVERY file in `.tdd-auto/design/` — design docs may be in any format: `.md`, `.txt`, `.adoc`, `.drawio`, images (PNG/SVG), etc.
 2. Note the document structure: sections, diagrams, API contracts, data models.
-3. Extract all Mermaid blocks for later use in the HTML review page.
+3. Inventory every diagram you find (see "Diagram Handling" below) so it can be referenced in the brainstorm notes and the final review package.
 
-## Extracting Diagrams
+## Diagram Handling
 
-Scan for code blocks marked as `mermaid`:
-```markdown
-```mermaid
-graph TD
-    A --> B
-```
-```
+Design diagrams are NOT limited to Mermaid. The skill must understand and preserve all of them:
 
-Store the inner content (between the fences) for later Mermaid.js rendering.
+- **Text-based diagram DSLs** — Mermaid, PlantUML, Graphviz/DOT, nomnoml, etc. These appear in fenced code blocks. Capture the raw block verbatim (including its language tag) so it can be re-embedded in markdown.
+- **UML / formal notation** — class diagrams, sequence diagrams, activity diagrams authored as text or images. Understand the relationships they express (inheritance, calls, flows).
+- **ASCII / box-drawing diagrams** — hand-drawn-in-text flows and tables. Interpret the directional/relationship meaning.
+- **Embedded images** — PNG/SVG/other raster or vector files. Inspect them visually and describe what they depict (components, flows, boundaries). Reference the file path so a human reviewer can open the original.
+
+**Golden rule:** never rewrite or "convert" an existing diagram into Mermaid (or any other format) unless the user explicitly asks. Preserve diagrams exactly as the author intended. The only time the skill authors a Mermaid diagram is when it generates a NEW one (e.g. inside `sub-problems.md`), because Mermaid renders natively on GitHub and in common markdown viewers.
 
 ## Ambiguity Checklist
 
@@ -29,7 +28,7 @@ When evaluating the design, check:
 - **Undefined data models**: tables, schemas, or entities without full structure
 - **Unspecified error handling**: what happens when things fail?
 - **Missing edge cases**: boundary conditions not covered
-- **Contradictory diagrams**: when a text diagram and a Mermaid diagram disagree
+- **Contradictory diagrams**: when two diagrams (or a diagram and prose) disagree about the same thing
 - **Assumed infrastructure**: external services, databases, queues mentioned but not documented
 
 ## Drift Types

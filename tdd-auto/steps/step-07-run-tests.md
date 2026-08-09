@@ -2,18 +2,21 @@
 
 ## Purpose
 
-Execute the agreed test suite.
+Execute the agreed test suite and actively drive it green.
 
-## Failure Recovery
+## Failure Recovery (fix, don't just retry)
 
-- If tests fail, attempt a recovery loop up to 2 times:
-  1. Spawn a subagent to analyze the failures.
-  2. Subagent proposes fixes to the affected code.
-  3. Re-run the tests.
-- If still failing after recovery attempts, surface to user with:
-  - Failing test IDs
-  - Error output
-  - Options: retry again, skip failing tests, or halt
+Tests failing is normal during a first run. The recovery loop must **analyze and fix** the failing code — not blindly re-run and hope:
+
+1. Spawn a subagent with the failing test output, the relevant sub-problem spec, and the affected source files.
+2. The subagent **applies fixes** to the affected code (and, if the test itself was wrong, corrects the test) while keeping every other agreed test case intact.
+3. Re-run the suite.
+4. Repeat up to 3 times. Only surface to the user if it still fails after real fix attempts.
+
+If still failing after recovery attempts, surface to user with:
+- Failing test IDs
+- Error output
+- Options: retry again, skip failing tests, or halt
 
 ## Rules
 
@@ -30,7 +33,7 @@ Execute the agreed test suite.
 
 4. **If all green** → advance.
 
-5. **If failures** → run recovery loop (up to 2 times). If failures persist, surface to user and HALT with status `blocked`.
+5. **If failures** → run the fix-focused recovery loop above (up to 3 times). If failures persist, surface to user and HALT with status `blocked`.
 
 6. **Update `progress.yaml`**
    - `last_saved`: current ISO timestamp

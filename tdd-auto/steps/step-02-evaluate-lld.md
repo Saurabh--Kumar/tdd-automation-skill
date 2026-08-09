@@ -8,12 +8,13 @@ Read design docs, surface ambiguities, detect architectural drift, and produce c
 
 - Read fully and execute completely before proceeding.
 - All artifacts are written to `{project-root}/.tdd-auto/runs/{feature-slug}/`.
+- Design docs may be in ANY format (`.md`, `.txt`, `.adoc`, `.drawio`, images, etc.). Read every file in the design directory; for binary/image files, inspect them visually and describe their content in your notes.
 
 ## Instructions
 
-1. **Read design docs.** List all files in `{progress.yaml.lld_dir}` (usually `.tdd-auto/design/`). Read each one.
+1. **Read design docs.** List ALL files in `{progress.yaml.lld_dir}` (usually `.tdd-auto/design/`) and read each one. For non-text files (images, diagrams), examine them and capture their meaning.
 
-2. **Extract diagrams.** Scan LLD files for Mermaid diagram blocks (` ```mermaid ` ... ` ``` `). Store their content for later use in the HTML review page.
+2. **Capture diagrams of every kind.** The LLD may contain diagrams in many forms — Mermaid, PlantUML, UML, ASCII art, sequence diagrams, or even embedded images (PNG/SVG). Use `references/lld-analysis.md` as a guide to how to inventory and interpret them. Do NOT force Mermaid onto existing diagrams: preserve and reference them exactly as they appear. Only when the skill itself needs to author a NEW diagram (e.g. inside `sub-problems.md`) does it use Mermaid, because Mermaid renders natively on GitHub and in most markdown viewers.
 
 3. **Read the request.** Re-read `progress.yaml`'s `feature_request` field. Also consider any clarifying answers the user has already provided.
 
@@ -22,7 +23,7 @@ Read design docs, surface ambiguities, detect architectural drift, and produce c
    - **Ambiguities in the request** — things that are unclear or could be interpreted multiple ways.
    - **Ambiguities found in the design** — gaps, contradictions, or under-specified sections in the LLD.
    - **Clarifying questions** — numbered list of questions for the user, one per ambiguity.
-   - **Relevant diagrams extracted from LLD** — list or embed any Mermaid blocks found.
+   - **Relevant diagrams** — describe and reference every diagram found in the LLD (type, location, and what it shows). Embed text-based diagrams (Mermaid/PlantUML/ASCII) verbatim; for image diagrams, note the file path and summarize what it depicts.
 
 5. **Produce `drift-report.md`.** For each significant divergence between the request and the LLD:
    - LLD says...
